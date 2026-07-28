@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ジャグラー究極カウンター</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ============================== -->
+    <!-- PAGE: 機種選択                 -->
+    <!-- ============================== -->
+    <div id="pageMachineSelect" class="page active">
+        <header>
+            <h1>🎰 ジャグラー究極カウンター</h1>
+            <div style="width:50px;"></div>
+        </header>
+        <div class="card">
+            <div style="font-size:0.85rem; color:var(--muted-color); margin-bottom:12px;">
+                機種を選択してください（東京標準ベース）
+            </div>
+            <ul class="machine-list" id="machineListContainer"></ul>
+            <button class="btn-action-primary" style="background:#1d4ed8; margin-top:16px;" onclick="shareBackupData()">
+                ✉️ メモやLINEにデータを保存・共有
+            </button>
+            <button class="btn-action-primary" style="background:#065f46; margin-top:8px;" onclick="exportBackupText()">
+                📋 バックアップ用テキストをコピー
+            </button>
+            <button class="btn-action-primary" style="background:#374151;" onclick="importBackupPrompt()">
+                📂 テキストからデータを復元
+            </button>
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- PAGE: 台一覧                   -->
+    <!-- ============================== -->
+    <div id="pageTableList" class="page">
+        <header>
+            <button class="btn-header-action" onclick="goMachineSelect()">🏠 機種選択</button>
+            <h1 id="activeMachineTitle">機種名</h1>
+            <div style="width:50px;"></div>
+        </header>
+        <div class="card">
+            <div class="sort-bar">
+                <span>並び替え</span>
+                <select id="sortTypeSelect" onchange="renderTableList()">
+                    <option value="dateDesc">📅 日付：新しい順</option>
+                    <option value="dateAsc">📅 日付：古い順</option>
+                    <option value="diffDesc">📈 差枚数：多い順</option>
+                    <option value="diffAsc">📉 差枚数：少ない順</option>
+                </select>
+            </div>
+            <ul class="table-list" id="tableListContainer"></ul>
+            <button class="btn-add" onclick="openStartModal()">＋ 新規実践開始</button>
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- PAGE 1: カウンター             -->
+    <!-- ============================== -->
+    <div id="page1" class="page">
+        <header>
+            <button class="btn-header-action" onclick="goTableList()">📁 台一覧</button>
+            <h1 id="activeTableName">台名</h1>
+            <button class="btn-header-action" onclick="openEditSessionModal()">店舗情報編集</button>
+        </header>
+
+        <div class="sub-tab-bar">
+            <button class="sub-tab-btn active" id="page1SubBtnA" onclick="switchPage1Sub(1)">① 全体情報</button>
+            <button class="sub-tab-btn" id="page1SubBtnB" onclick="switchPage1Sub(2)">② 自分の区間(カウンター)</button>
+        </div>
+
+        <!-- サブタブ①: 台全体の情報（これまでの総ゲーム数・BIG/REG） -->
+        <div id="page1SubA" class="sub-page active">
+            <div class="game-input-area">
+                <label>総回転数 (G)</label>
+                <input type="tel" inputmode="numeric" pattern="\d*" id="totalGamesInput" value="0"
+                       oninput="updateGamesFromInput()" onblur="updateGamesFromInput()">
+            </div>
+
+            <div class="game-input-area" style="border-color:#374151;">
+                <label style="font-size:0.85rem;">🚪 開始時のG数<br><span style="font-size:0.7rem; color:var(--muted-color); font-weight:normal;">(後乗り時点。最初からなら0)</span></label>
+                <input type="tel" inputmode="numeric" pattern="\d*" id="startGamesInput" value="0"
+                       oninput="updateStartGamesFromInput()" onblur="updateStartGamesFromInput()">
+            </div>
+
+            <div class="card" style="padding:14px; border-color:#374151; margin-bottom:12px;">
+                <div class="input-label" style="color:var(--accent-gold); font-weight:bold; margin-bottom:8px;">
+                    🚪 前任者までの累計（最初から打つ場合は0でOK）
+                </div>
+                <div class="config-box">
+                    <span>前任者までのBIG回数</span>
+                    <input type="tel" inputmode="numeric" pattern="\d*" id="prevBigInput" value="0"
+                           oninput="updatePrevCountsFromInput()" onblur="updatePrevCountsFromInput()">
+                </div>
+                <div class="config-box" style="margin-bottom:0;">
+                    <span>前任者までのREG回数</span>
+                    <input type="tel" inputmode="numeric" pattern="\d*" id="prevRegInput" value="0"
+                           oninput="updatePrevCountsFromInput()" onblur="updatePrevCountsFromInput()">
+                </div>
+            </div>
+
+            <div class="main-summary-box" id="mainSummaryBox">
+                <span>BIG: 0回</span><span>REG: 0回</span><span>合算: 1/0.0</span>
+            </div>
+        </div>
+
+        <!-- サブタブ②: 自分が打っている区間のカウンター -->
+        <div id="page1SubB" class="sub-page">
+            <div class="own-segment-info" id="ownSegmentInfo">
+                自分の区間: 0 G（総 0G − 開始 0G）
+            </div>
+
+            <div class="main-summary-box" id="ownSummaryBox">
+                <span>BIG: 0回</span><span>REG: 0回</span><span>合算: 1/0.0</span>
+            </div>
+
+            <div class="counter-section">
+                <div class="counter-card">
+                    <div class="counter-header">
+                        <span class="counter-title" style="color: #34d399;">🟢 ぶどう</span>
+                        <button class="btn-sub-tiny" onclick="changeCount('budou', -1)">-1</button>
+                    </div>
+                    <div class="counter-count" id="budouCount">0</div>
+                    <div class="counter-prob" id="budouProb">(1/0.00)</div>
+                    <button class="btn-huge btn-budou" onclick="changeCount('budou', 1)">＋ ぶどう</button>
+                </div>
+
+                <div class="counter-card">
+                    <div class="counter-header">
+                        <span class="counter-title" style="color: #60a5fa;">🔴 チェリー</span>
+                        <button class="btn-sub-tiny" onclick="changeCount('cherry', -1)">-1</button>
+                    </div>
+                    <div class="counter-count" id="cherryCount">0</div>
+                    <div class="counter-prob" id="cherryProb">(1/0.00)</div>
+                    <button class="btn-huge btn-cherry" onclick="changeCount('cherry', 1)">＋ チェリー</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- PAGE 2: ボーナス追加＆履歴管理 -->
+    <!-- ============================== -->
+    <div id="page2" class="page">
+        <header>
+            <button class="btn-header-action" onclick="goTableList()">📁 台一覧</button>
+            <h1>ボーナス詳細入力</h1>
+            <div style="width:50px;"></div>
+        </header>
+        <div class="card">
+            <div class="input-group">
+                <div class="input-label">成立ゲーム数 (G)</div>
+                <input type="tel" inputmode="numeric" pattern="\d*" id="bonusGameInput" placeholder=""
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px;
+                              padding:12px; font-size:1.3rem; width:100%; text-align:right; font-weight:bold;">
+            </div>
+
+            <div class="input-group">
+                <div class="input-label">ボーナス種類</div>
+                <div class="select-grid-2">
+                    <button class="select-btn sel-big" id="typeBig" onclick="selectBonusType('BIG')">BIG</button>
+                    <button class="select-btn" id="typeReg" onclick="selectBonusType('REG')">REG</button>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <div class="input-label">当選契機</div>
+                <div class="select-grid-detail">
+                    <button class="select-btn sel-active" id="trigSingle" onclick="selectTrigger('単独')">単独</button>
+                    <button class="select-btn" id="trigCherry" onclick="selectTrigger('チェリー重複')">チェリー重複</button>
+                    <button class="select-btn" id="trigRare" onclick="selectTrigger('レアチェリー / 一枚役')">レアチェリー / 一枚役</button>
+                    <button class="select-btn" id="trigUnknown" onclick="selectTrigger('不明')">不明</button>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="saki-toggle">
+                    <input type="checkbox" id="sakiPekaCheck">
+                    <span>✨ 先ペカの時だけチェック</span>
+                </label>
+            </div>
+
+            <div class="input-group">
+                <div class="input-label">カスタムメモ</div>
+                <input type="text" id="customTriggerInput" placeholder="例: プレミアム、ガコッ無し等"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px;
+                              padding:10px; font-size:1rem; width:100%;">
+                <div class="quick-tags">
+                    <button class="tag-btn" onclick="document.getElementById('customTriggerInput').value=''">クリア</button>
+                </div>
+            </div>
+
+            <button class="btn-register-clean" onclick="registerBonus()">＋ 履歴に追加</button>
+        </div>
+
+        <div class="card">
+            <div class="input-label" style="color:var(--accent-gold); font-weight:bold; margin-bottom:8px;">
+                【 ボーナス履歴一覧（詳細編集可能） 】
+            </div>
+            <ul class="history-list" id="page2HistoryList">
+                <li style="text-align: center; color: var(--muted-color); padding: 20px;">履歴なし</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- PAGE 3: 設定推測＆スペック      -->
+    <!-- ============================== -->
+    <div id="page3" class="page">
+        <header>
+            <button class="btn-header-action" onclick="goTableList()">📁 台一覧</button>
+            <h1>詳細設定推測＆スペック</h1>
+            <div style="width:50px;"></div>
+        </header>
+
+        <div class="sub-tab-bar">
+            <button class="sub-tab-btn active" id="page3SubBtnA" onclick="switchPage3Sub(1)">① 台全体</button>
+            <button class="sub-tab-btn" id="page3SubBtnB" onclick="switchPage3Sub(2)">② 自分の区間</button>
+        </div>
+
+        <div id="page3SubA" class="sub-page active">
+            <div class="card">
+                <div class="input-label" style="margin-bottom:6px; color:var(--accent-gold); font-weight:bold;">
+                    【 台全体：合算・BIG確率・REG確率 】
+                </div>
+                <div style="font-size:0.7rem; color:var(--muted-color); margin-bottom:8px;">
+                    ※Page1で入力した「前任者までのBIG/REG回数」を含めた台全体の値です
+                </div>
+                <table class="table-custom" id="approxTable">
+                    <tr><th>項目</th><th>現在値</th><th>近似設定</th></tr>
+                </table>
+            </div>
+        </div>
+
+        <div id="page3SubB" class="sub-page">
+            <div class="card">
+                <div class="input-label" style="margin-bottom:6px; color:var(--accent-gold); font-weight:bold;">
+                    【 自分の区間：全項目の近似値判定 】
+                </div>
+                <div class="own-segment-info" id="ownSegmentInfoPage3" style="margin-bottom:8px;">
+                    自分の区間: 0 G（総 0G − 開始 0G）
+                </div>
+                <div style="font-size:0.7rem; color:var(--muted-color); margin-bottom:8px;">
+                    ※ボーナス履歴のうち「成立ゲーム数」が開始時G数以上のものだけを集計します
+                </div>
+                <table class="table-custom" id="approxTableOwn">
+                    <tr><th>項目</th><th>現在値</th><th>近似設定</th></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="input-label" style="margin-bottom:6px; color:var(--accent-gold); font-weight:bold;" id="columnTitle">
+                【 機種別・設定推測の重要ポイント 】
+            </div>
+            <div class="column-box" id="columnContent"></div>
+        </div>
+
+        <div class="card">
+            <div class="input-label" style="margin-bottom:6px; color:var(--accent-gold); font-weight:bold;" id="refTitle">
+                【 全設定スペックリファレンス 】
+            </div>
+            <div class="ref-scroll">
+                <table class="table-custom" id="refTable"></table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- PAGE 4: 収支・設定メモ          -->
+    <!-- ============================== -->
+    <div id="page4" class="page">
+        <header>
+            <button class="btn-header-action" onclick="goTableList()">📁 台一覧</button>
+            <h1>収支・設定メモ</h1>
+            <div style="width:50px;"></div>
+        </header>
+
+        <div class="card">
+            <div class="input-label" style="margin-bottom:8px; color:var(--accent-gold); font-weight:bold;">
+                【 実戦基本情報・収支設定 (東京標準) 】
+            </div>
+
+            <div class="config-box">
+                <span>📅 日付 (年月日)</span>
+                <input type="date" id="inputDate" oninput="updateConfigs()" onchange="updateConfigs()" onblur="updateConfigs()">
+            </div>
+
+            <div class="config-box">
+                <span>貸出方式</span>
+                <select id="rateType" onchange="updateConfigs()">
+                    <option value="46" selected>20スロ (46枚貸)</option>
+                    <option value="20">20スロ (50枚貸)</option>
+                    <option value="custom">カスタム枚数</option>
+                </select>
+            </div>
+
+            <div class="config-box" id="customRateBox" style="display:none;">
+                <span>1000円貸出枚数</span>
+                <input type="tel" id="inputCustomRate" value="46" oninput="updateConfigs()" onblur="updateConfigs()">
+            </div>
+
+            <div class="config-box">
+                <span>交換ギャップ</span>
+                <select id="gapType" onchange="updateConfigs()">
+                    <option value="5.2">5.2枚交換 </option>
+                    <option value="5.6" selected>5.6枚交換 (東京標準)</option>
+                    <option value="eq">等価</option>
+                    <option value="6">6枚交換</option>
+                </select>
+            </div>
+
+            <div class="config-box">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <span>投資金額 (円)</span>
+                    <span id="investCoinsLabel" style="font-size:0.75rem; color:var(--muted-color);">(0枚)</span>
+                </div>
+                <div style="display:flex; gap:4px; align-items:center;">
+                    <button class="btn-tiny-del" onclick="addInvestment(-1000)">-1000</button>
+                    <button class="btn-small-action" onclick="addInvestment(1000)">＋1000</button>
+                    <input type="tel" id="inputInvestment" value="0" oninput="updateConfigs()" onblur="updateConfigs()">
+                </div>
+            </div>
+
+            <div class="config-box">
+                <span>回収入力方式</span>
+                <select id="recoveryMode" onchange="updateConfigs()">
+                    <option value="coins" selected>枚数で入力</option>
+                    <option value="yen">金額(円)で入力</option>
+                </select>
+            </div>
+
+            <div class="config-box">
+                <div style="display:flex; flex-direction:column; gap:2px;">
+                    <span id="recoveryLabelTitle">回収枚数</span>
+                    <span id="recoverySubLabel" style="font-size:0.75rem; color:var(--muted-color);">(¥0)</span>
+                </div>
+                <div style="display:flex; gap:4px; align-items:center;">
+                    <button class="btn-tiny-del" id="btnDecRecovery" onclick="addRecoveryStep(-1)">-50</button>
+                    <button class="btn-small-action" id="btnIncRecovery" onclick="addRecoveryStep(1)">＋50</button>
+                    <input type="tel" id="inputRecovery" value="0" oninput="updateConfigs()" onblur="updateConfigs()">
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-top:12px;">
+                <div class="input-label" style="color:var(--accent-gold); font-weight:bold;">
+                    📝 本日の状況メモ（特日・周りの状況など）
+                </div>
+                <textarea id="inputMemo" placeholder="例: イベント日、角2が強い、周りのREGも良好など"
+                          oninput="updateConfigs()" onblur="updateConfigs()"></textarea>
+            </div>
+
+            <div class="input-group" style="margin-top:12px;">
+                <div class="input-label" style="color:var(--accent-gold); font-weight:bold;">
+                    📸 実戦データ・スクショ画像の保存
+                </div>
+                <div id="imageArea">
+                    <div class="image-upload-box" id="uploadBox">
+                        <span>📷 タップして画像を選択 / スクショを貼り付け(Ctrl+V)</span>
+                        <input type="file" id="imageFileInput" accept="image/*" onchange="handleImageUpload(event)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-label" style="margin: 14px 0 6px 0; color:var(--accent-gold); font-weight:bold;">
+                【 1日トータル集計結果 】
+            </div>
+            <div class="summary-card-grid">
+                <div class="summary-mini-box">
+                    <div class="label">総回転数</div>
+                    <div class="value" id="sumGames">0 G</div>
+                </div>
+                <div class="summary-mini-box">
+                    <div class="label">ボーナス合算</div>
+                    <div class="value" id="sumGappei">1/0.0</div>
+                </div>
+                <div class="summary-mini-box">
+                    <div class="label">推定差枚数</div>
+                    <div class="value" id="sumDiffCoins">0 枚</div>
+                </div>
+                <div class="summary-mini-box">
+                    <div class="label">トータル収支</div>
+                    <div class="value" id="sumBalance">¥0</div>
+                </div>
+                <div class="summary-mini-box" style="grid-column: span 2;">
+                    <div class="label">推定機械割</div>
+                    <div class="value" id="sumKikaigari">0.0%</div>
+                </div>
+            </div>
+
+            <div class="input-label" style="margin: 14px 0 6px 0; color:var(--accent-gold); font-weight:bold;">
+                【 ボーナス履歴一覧（閲覧用） 】
+            </div>
+            <ul class="history-list" id="page4HistoryList">
+                <li style="text-align: center; color: var(--muted-color); padding: 20px;">履歴なし</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="nav-tabs" id="bottomNavTabs" style="display: none;">
+        <button class="tab-btn active" onclick="switchPage(1)">1. カウンター</button>
+        <button class="tab-btn" onclick="switchPage(2)">2. ボナ</button>
+        <button class="tab-btn" onclick="switchPage(3)">3. 推測</button>
+        <button class="tab-btn" onclick="switchPage(4)">4. 収支</button>
+    </div>
+
+    <!-- ============================== -->
+    <!-- MODAL: 新規実践開始              -->
+    <!-- ============================== -->
+    <div class="modal-overlay" id="startModal">
+        <div class="modal-card">
+            <div class="modal-title">新規実践開始</div>
+            <div class="input-group">
+                <div class="input-label">📅 日付</div>
+                <input type="date" id="modalDateInput"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%; font-weight:bold;">
+            </div>
+            <div class="input-group">
+                <div class="input-label">店名</div>
+                <input type="text" id="modalShopInput" placeholder="例: ○○店"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%;">
+            </div>
+            <div class="input-group">
+                <div class="input-label">台番号（任意）</div>
+                <input type="text" id="modalNumberInput" placeholder="例: 123番台"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%;">
+            </div>
+            <div class="input-group">
+                <div class="input-label">メモ（任意）</div>
+                <input type="text" id="modalMemoInput" placeholder="例: 角台、据え置き狙い等"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%;">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:16px;">
+                <button class="btn-action-primary" style="background:#374151; margin-top:0;" onclick="closeStartModal()">キャンセル</button>
+                <button class="btn-action-primary" style="background:#047857; margin-top:0;" onclick="startNewSessionFromModal()">開始</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- MODAL: 店舗情報編集              -->
+    <!-- ============================== -->
+    <div class="modal-overlay" id="editSessionModal">
+        <div class="modal-card">
+            <div class="modal-title">店舗情報編集</div>
+            <div class="input-group">
+                <div class="input-label">📅 日付</div>
+                <input type="date" id="editDateInput"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%; font-weight:bold;">
+            </div>
+            <div class="input-group">
+                <div class="input-label">店名</div>
+                <input type="text" id="editShopInput"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%;">
+            </div>
+            <div class="input-group">
+                <div class="input-label">台番号（任意）</div>
+                <input type="text" id="editNumberInput"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%;">
+            </div>
+            <div class="input-group">
+                <div class="input-label">メモ（任意）</div>
+                <input type="text" id="editMemoInput"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%;">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:16px;">
+                <button class="btn-action-primary" style="background:#374151; margin-top:0;" onclick="closeEditSessionModal()">キャンセル</button>
+                <button class="btn-action-primary" style="background:#1d4ed8; margin-top:0;" onclick="saveEditSessionModal()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- MODAL: ボーナス詳細編集          -->
+    <!-- ============================== -->
+    <div class="modal-overlay" id="editBonusModal">
+        <div class="modal-card">
+            <div class="modal-title">ボーナス履歴編集</div>
+            <input type="hidden" id="editBonusId">
+            <div class="input-group">
+                <div class="input-label">成立ゲーム数 (G)</div>
+                <input type="tel" inputmode="numeric" pattern="\d*" id="editBonusGamesInput"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1.1rem; width:100%; text-align:right; font-weight:bold;">
+            </div>
+            <div class="input-group">
+                <div class="input-label">ボーナス種類</div>
+                <select id="editBonusTypeSelect" style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%; font-weight:bold;">
+                    <option value="BIG">BIG</option>
+                    <option value="REG">REG</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <div class="input-label">当選契機</div>
+                <select id="editBonusTriggerSelect" style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%; font-weight:bold;">
+                    <option value="単独">単独</option>
+                    <option value="チェリー重複">チェリー重複</option>
+                    <option value="レアチェリー / 一枚役">レアチェリー / 一枚役</option>
+                    <option value="不明">不明</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <div class="input-label">ペカ・カスタムメモ</div>
+                <input type="text" id="editBonusCustomInput" placeholder="例: 先ペカ / 後ペカ [プレミアム]"
+                       style="background:#0b0f19; color:#fff; border:1px solid var(--border-color); border-radius:8px; padding:10px; font-size:1rem; width:100%;">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:16px;">
+                <button class="btn-action-primary" style="background:#374151; margin-top:0;" onclick="closeEditBonusModal()">キャンセル</button>
+                <button class="btn-action-primary" style="background:#1d4ed8; margin-top:0;" onclick="saveEditBonusModal()">保存</button>
+            </div>
+        </div>
+    </div>
+
+<script src="script.js"></script>
+</body>
+</html>
